@@ -11,22 +11,23 @@
   },
   "dependencies": {
     "@wailsio/runtime": "latest",
+    "qweather-icons": "^1.8.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.18",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^5.0.8",
-    "tailwindcss": "^4.1.18",
-    "@tailwindcss/vite": "^4.1.18",
+    "@vitest/ui": "^1.1.0",
     "eslint": "^9.39.2",
-    "prettier": "^3.7.4",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
-    "vitest": "^1.1.0",
-    "@vitest/ui": "^1.1.0",
-    "jsdom": "^23.0.1"
+    "jsdom": "^23.0.1",
+    "prettier": "^3.7.4",
+    "tailwindcss": "^4.1.18",
+    "vite": "^5.0.8",
+    "vitest": "^1.1.0"
   }
 }

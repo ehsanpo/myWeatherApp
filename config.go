@@ -77,9 +77,13 @@ func (a *App) GetDefaultConfig() *AppConfig {
 	return &AppConfig{
 		Theme:        "light",
 		Language:     "en",
-		WindowWidth:  1024,
-		WindowHeight: 768,
-		CustomSettings: make(map[string]interface{}),
+		WindowWidth:  400,
+		WindowHeight: 600,
+		CustomSettings: map[string]interface{}{
+			"weatherLocation": "New York",
+			"updateInterval":  300, // 5 minutes in seconds
+			"temperatureUnit": "celsius",
+		},
 	}
 }
 

@@ -1,11 +1,12 @@
 package main
 
 import (
-	"os"
+	//"os"
 	"fmt"
 	"embed"
 	_ "embed"
 	"log"
+	"runtime"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -24,13 +25,57 @@ var trayIcon []byte
 
 // App struct to hold application state and provide utility methods
 type App struct {
+	mainWindow *application.WebviewWindow
 }
 
-func init() {
-	// Register a custom event whose associated data type is string.
-	// This is not required, but the binding generator will pick up registered events
-	// and provide a strongly typed JS/TS API for them.
-	application.RegisterEvent[string]("time")
+// HideWindow hides the main window
+func (a *App) HideWindow() {
+	if a.mainWindow != nil {
+		a.mainWindow.Hide()
+	}
+}
+
+// MinimizeWindow minimizes the main window
+func (a *App) MinimizeWindow() {
+	if a.mainWindow != nil {
+		a.mainWindow.Minimise()
+	}
+}
+
+// PositionWindowNearTray positions the window near the system tray
+func (a *App) PositionWindowNearTray() {
+	if a.mainWindow == nil {
+		return
+	}
+
+	// Get primary screen dimensions
+	screen, err := a.mainWindow.GetScreen()
+	if err != nil || screen == nil {
+		log.Printf("Failed to get screen: %v", err)
+		return
+	}
+
+	windowWidth := 400
+	windowHeight := 600
+	padding := 10
+
+	var x, y int
+
+	if runtime.GOOS == "windows" {
+		// Windows: Position at bottom-right above taskbar
+		x = screen.Size.Width - windowWidth - padding
+		y = screen.Size.Height - windowHeight - padding - 40 // Extra space for taskbar
+	} else if runtime.GOOS == "darwin" {
+		// macOS: Position at top-right below menu bar
+		x = screen.Size.Width - windowWidth - padding
+		y = padding + 25 // Space for menu bar
+	} else {
+		// Linux/other: Position at top-right
+		x = screen.Size.Width - windowWidth - padding
+		y = padding
+	}
+
+	a.mainWindow.SetPosition(x, y)
 }
 
 // main function serves as the application's entry point. It initializes the application, creates a window,
@@ -45,36 +90,85 @@ func main() {
 	// 'Mac' options tailor the application when running an macOS.
 	// Create app instance for methods
 	appInstance := &App{}
+	weatherService := NewWeatherService(appInstance)
 
 	app := application.New(application.Options{
 		Name:        "myWeatherApp",
-		Description: "A demo of using raw HTML & CSS",
+		Description: "A weather app with system tray",
 		Services: []application.Service{
-			application.NewService(&GreetService{}),
+			application.NewService(weatherService),
 			application.NewService(appInstance),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
 		Mac: application.MacOptions{
-			ApplicationShouldTerminateAfterLastWindowClosed: true,
+			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
 	})
 
 	// Create system tray
 	systray := app.SystemTray.New()
-	systray.SetIcon(trayIcon)
-	systray.SetLabel("myWeatherApp")
+	
+	// Function to update tray icon with current weather
+	updateTrayIcon := func() {
+		weather, err := weatherService.GetWeather("")
+		if err == nil {
+			// Generate icon with temperature
+			iconData, err := generateTrayIconWithWeather(weather)
+			if err == nil {
+				systray.SetIcon(iconData)
+			}
+			// Also set tooltip with location info
+			systray.SetLabel(fmt.Sprintf("%s: %.0f°C - %s", weather.Location, weather.Temperature, weather.Condition))
+		}
+	}
+	
+	// Set initial icon
+	updateTrayIcon()
+	
+	// Update tray icon periodically
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			updateTrayIcon()
+		}
+	}()
+
+	// Create a new window with the necessary options.
+	mainWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
+		Title: "Weather App",
+		Mac: application.MacWindow{
+			InvisibleTitleBarHeight: 50,
+			Backdrop:                application.MacBackdropTranslucent,
+			TitleBar:                application.MacTitleBarHiddenInset,
+		},
+		Width:            400,
+		Height:           600,
+		MinWidth:         400,
+		MinHeight:        600,
+		MaxWidth:         400,
+		MaxHeight:        600,
+		BackgroundColour: application.NewRGBA(0, 0, 0, 0),
+		URL:              "/",
+		Hidden:           false,
+		Frameless:        true,
+})	// Store window reference in app instance
+	appInstance.mainWindow = mainWindow
 
 	// Add system tray menu
 	menu := app.NewMenu()
-	menu.Add("Show Window").OnClick(func(ctx *application.Context) {
-		// Show and unminimize the window
-		windows := app.Window.GetAll()
-		if len(windows) > 0 {
-			windows[0].Show()
-			windows[0].UnMinimise()
-		}
+	menu.Add("Show Weather").OnClick(func(ctx *application.Context) {
+		mainWindow.Show()
+		mainWindow.UnMinimise()
+		mainWindow.Focus()
+		// Position after showing the window
+		appInstance.PositionWindowNearTray()
+	})
+	menu.AddSeparator()
+	menu.Add("Refresh Weather").OnClick(func(ctx *application.Context) {
+		updateTrayIcon()
 	})
 	menu.AddSeparator()
 	menu.Add("Quit").OnClick(func(ctx *application.Context) {
@@ -82,39 +176,13 @@ func main() {
 	})
 	systray.SetMenu(menu)
 
-	// Create a new window with the necessary options.
-	// 'Title' is the title of the window.
-	// 'Mac' options tailor the window when running on macOS.
-	// 'BackgroundColour' is the background colour of the window.
-	// 'URL' is the URL that will be loaded into the webview.
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: "Window 1",
-		Mac: application.MacWindow{
-			InvisibleTitleBarHeight: 50,
-			Backdrop:                application.MacBackdropTranslucent,
-			TitleBar:                application.MacTitleBarHiddenInset,
-		},
-		BackgroundColour: application.NewRGB(27, 38, 54),
-		URL:              "/",
-	})
-
-	// Create a goroutine that emits an event containing the current time every second.
-	// The frontend can listen to this event and update the UI accordingly.
-	go func() {
-		for {
-			now := time.Now().Format(time.RFC1123)
-			app.Event.Emit("time", now)
-			time.Sleep(time.Second)
-		}
-	}()
-
 	// Run the application. This blocks until the application has been exited.
-		// Initialize single instance lock
-	if err := initSingleInstance(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer releaseSingleInstance()
+	// Initialize single instance lock
+	//if err := initSingleInstance(); err != nil {
+	//	fmt.Println(err)
+	//	os.Exit(1)
+	//}
+	//defer releaseSingleInstance()
 
 	err := app.Run()
 
