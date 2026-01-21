@@ -32,7 +32,7 @@ type GitHubRelease struct {
 
 const (
 	CurrentVersion = "v1.0.0"     // Update this with your app version
-	GitHubRepo     = "owner/repo" // Update with your GitHub repo
+	GitHubRepo     = "ehsanpo/myWeatherApp" // Update with your GitHub repo
 	CheckInterval  = 24 * time.Hour
 )
 
