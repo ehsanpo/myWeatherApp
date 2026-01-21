@@ -24,7 +24,7 @@ function App() {
 
   const handleMinimize = async () => {
     try {
-      const { HideWindow } = await import('../bindings/changeme/app');
+      const { HideWindow } = await import('../bindings/weatherApp/app');
       await HideWindow();
     } catch (error) {
       console.error('Failed to hide window:', error);
@@ -35,7 +35,7 @@ function App() {
   const loadWeather = async () => {
     try {
       setLoading(true);
-      const { GetWeather } = await import('../bindings/changeme/weatherservice');
+      const { GetWeather } = await import('../bindings/weatherApp/weatherservice');
       const data = await GetWeather(location);
       setWeather(data);
 
@@ -56,11 +56,36 @@ function App() {
     }
   };
 
+  // Refresh weather with tray icon update
+  const refreshWeather = async () => {
+    try {
+      setLoading(true);
+      const { RefreshWeather } = await import('../bindings/weatherApp/weatherservice');
+      const data = await RefreshWeather(location);
+      setWeather(data);
+
+      // Load icons for current weather and forecast
+      const icons = {};
+      icons[data.icon] = await loadIcon(data.icon);
+      for (const day of data.forecast) {
+        if (!icons[day.icon]) {
+          icons[day.icon] = await loadIcon(day.icon);
+        }
+      }
+      setWeatherIcons(icons);
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Failed to refresh weather:', error);
+      setLoading(false);
+    }
+  };
+
   const handleUpdateLocation = async () => {
     if (!newLocation.trim()) return;
 
     try {
-      const { UpdateLocation } = await import('../bindings/changeme/weatherservice');
+      const { UpdateLocation } = await import('../bindings/weatherApp/weatherservice');
       await UpdateLocation(newLocation);
       setLocation(newLocation);
       setEditingLocation(false);
@@ -72,7 +97,7 @@ function App() {
 
   const getStoredLocation = async () => {
     try {
-      const { GetStoredLocation } = await import('../bindings/changeme/weatherservice');
+      const { GetStoredLocation } = await import('../bindings/weatherApp/weatherservice');
       const stored = await GetStoredLocation();
       setLocation(stored);
     } catch (error) {
@@ -114,11 +139,6 @@ function App() {
   return (
     <div className="weather-app">
       <div className="window-controls">
-        <button className="minimize-btn" onClick={handleMinimize} title="Hide to tray">
-          ✕
-        </button>
-      </div>
-      <div className="weather-header">
         <div className="location-section">
           {!editingLocation ? (
             <>
@@ -147,16 +167,17 @@ function App() {
             </div>
           )}
         </div>
+        <button className="minimize-btn" onClick={handleMinimize} title="Hide to tray">
+          ✕
+        </button>
+      </div>
+      <div className="weather-header">
         <div className="last-updated">
           Updated: {new Date(weather.lastUpdated).toLocaleTimeString()}
         </div>
       </div>
 
       <div className="current-weather">
-        <div
-          className="weather-icon-large"
-          dangerouslySetInnerHTML={{ __html: weatherIcons[weather.icon] || '' }}
-        />
         <div className="temperature">
           <span className="temp-value">{Math.round(weather.temperature)}°</span>
           <span className="temp-unit">C</span>
@@ -176,26 +197,7 @@ function App() {
         </div>
       </div>
 
-      <div className="forecast">
-        <h3>5-Day Forecast</h3>
-        <div className="forecast-list">
-          {weather.forecast.map((day, index) => (
-            <div key={index} className="forecast-item">
-              <div className="forecast-day">{day.dayOfWeek.substring(0, 3)}</div>
-              <div
-                className="weather-icon-small"
-                dangerouslySetInnerHTML={{ __html: weatherIcons[day.icon] || '' }}
-              />
-              <div className="forecast-temps">
-                <span className="temp-max">{Math.round(day.maxTemp)}°</span>
-                <span className="temp-min">{Math.round(day.minTemp)}°</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <button className="refresh-btn" onClick={loadWeather}>
+      <button className="refresh-btn" onClick={refreshWeather}>
         🔄 Refresh
       </button>
     </div>

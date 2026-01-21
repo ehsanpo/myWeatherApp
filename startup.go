@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
+	"golang.org/x/sys/windows/registry"
 	"os"
 	"path/filepath"
 	"runtime"
-	"golang.org/x/sys/windows/registry"
 )
 
 // EnableStartup enables the app to launch on system startup
@@ -56,13 +56,13 @@ func (a *App) enableStartupWindows() error {
 	if err != nil {
 		return err
 	}
-	
+
 	key, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Run`, registry.SET_VALUE)
 	if err != nil {
 		return err
 	}
 	defer key.Close()
-	
+
 	return key.SetStringValue("myWeatherApp", exePath)
 }
 
@@ -72,7 +72,7 @@ func (a *App) disableStartupWindows() error {
 		return err
 	}
 	defer key.Close()
-	
+
 	return key.DeleteValue("myWeatherApp")
 }
 
@@ -82,7 +82,7 @@ func (a *App) isStartupEnabledWindows() (bool, error) {
 		return false, nil
 	}
 	defer key.Close()
-	
+
 	_, _, err = key.GetStringValue("myWeatherApp")
 	return err == nil, nil
 }
@@ -93,18 +93,18 @@ func (a *App) enableStartupMacOS() error {
 	if err != nil {
 		return err
 	}
-	
+
 	launchAgentsDir := filepath.Join(homeDir, "Library/LaunchAgents")
 	if err := os.MkdirAll(launchAgentsDir, 0755); err != nil {
 		return err
 	}
-	
+
 	plistPath := filepath.Join(launchAgentsDir, "com.myWeatherApp.plist")
 	exePath, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	
+
 	plistContent := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -119,7 +119,7 @@ func (a *App) enableStartupMacOS() error {
 	<true/>
 </dict>
 </plist>`, exePath)
-	
+
 	return os.WriteFile(plistPath, []byte(plistContent), 0644)
 }
 
@@ -148,25 +148,25 @@ func (a *App) enableStartupLinux() error {
 	if err != nil {
 		return err
 	}
-	
+
 	autostartDir := filepath.Join(homeDir, ".config/autostart")
 	if err := os.MkdirAll(autostartDir, 0755); err != nil {
 		return err
 	}
-	
+
 	desktopPath := filepath.Join(autostartDir, "myWeatherApp.desktop")
 	exePath, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	
+
 	desktopContent := fmt.Sprintf(`[Desktop Entry]
 Type=Application
 Name=My Weather App 2
 Exec=%s
 Terminal=false
 X-GNOME-Autostart-enabled=true`, exePath)
-	
+
 	return os.WriteFile(desktopPath, []byte(desktopContent), 0644)
 }
 

@@ -2,15 +2,20 @@ package main
 
 import (
 	//"os"
-	"fmt"
 	"embed"
 	_ "embed"
+	"fmt"
 	"log"
 	"runtime"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
+
+// Register custom events
+func init() {
+	application.RegisterEvent[*WeatherData]("trayIconUpdate")
+}
 
 // Wails uses Go's `embed` package to embed the frontend files into the binary.
 // Any files in the frontend/dist folder will be embedded into the binary and
@@ -56,7 +61,7 @@ func (a *App) PositionWindowNearTray() {
 	}
 
 	windowWidth := 400
-	windowHeight := 600
+	windowHeight := 450
 	padding := 10
 
 	var x, y int
@@ -109,24 +114,41 @@ func main() {
 
 	// Create system tray
 	systray := app.SystemTray.New()
-	
+
+	// Create a function to update tray icon that can be called from weather service
+	updateTrayIconFunc := func(weather *WeatherData) {
+		log.Printf("Updating tray icon: Location=%s, Temperature=%.2f°C, Condition=%s",
+			weather.Location, weather.Temperature, weather.Condition)
+
+		iconData, err := generateTrayIconWithWeather(weather)
+		if err == nil {
+			systray.SetIcon(iconData)
+		} else {
+			log.Printf("Failed to generate tray icon: %v", err)
+		}
+		systray.SetLabel(fmt.Sprintf("%s: %.0f°C - %s", weather.Location, weather.Temperature, weather.Condition))
+	}
+
+	// Pass the update function to the weather service
+	weatherService.SetTrayUpdateFunc(updateTrayIconFunc)
+
 	// Function to update tray icon with current weather
 	updateTrayIcon := func() {
 		weather, err := weatherService.GetWeather("")
-		if err == nil {
-			// Generate icon with temperature
-			iconData, err := generateTrayIconWithWeather(weather)
-			if err == nil {
-				systray.SetIcon(iconData)
-			}
-			// Also set tooltip with location info
-			systray.SetLabel(fmt.Sprintf("%s: %.0f°C - %s", weather.Location, weather.Temperature, weather.Condition))
+		if err != nil {
+			log.Printf("Failed to get weather: %v", err)
+			return
 		}
+
+		log.Printf("Weather data: Location=%s, Temperature=%.2f°C, Condition=%s",
+			weather.Location, weather.Temperature, weather.Condition)
+
+		updateTrayIconFunc(weather)
 	}
-	
+
 	// Set initial icon
 	updateTrayIcon()
-	
+
 	// Update tray icon periodically
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
@@ -145,17 +167,27 @@ func main() {
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
 		Width:            400,
-		Height:           600,
+		Height:           450,
 		MinWidth:         400,
-		MinHeight:        600,
+		MinHeight:        450,
 		MaxWidth:         400,
-		MaxHeight:        600,
+		MaxHeight:        450,
 		BackgroundColour: application.NewRGBA(0, 0, 0, 0),
 		URL:              "/",
-		Hidden:           false,
+		Hidden:           true, // Start hidden
 		Frameless:        true,
-})	// Store window reference in app instance
+	})
+	// Store window reference in app instance
 	appInstance.mainWindow = mainWindow
+
+	// Show and position window after a delay
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		log.Println("Positioning and showing window...")
+		appInstance.PositionWindowNearTray()
+		mainWindow.Show()
+		log.Println("Window shown and positioned")
+	}()
 
 	// Add system tray menu
 	menu := app.NewMenu()

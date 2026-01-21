@@ -31,7 +31,7 @@ type GitHubRelease struct {
 }
 
 const (
-	CurrentVersion = "v1.0.0" // Update this with your app version
+	CurrentVersion = "v1.0.0"     // Update this with your app version
 	GitHubRepo     = "owner/repo" // Update with your GitHub repo
 	CheckInterval  = 24 * time.Hour
 )
@@ -39,7 +39,7 @@ const (
 // CheckForUpdates checks if a new version is available
 func (a *App) CheckForUpdates() (*UpdateInfo, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", GitHubRepo)
-	
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
@@ -72,7 +72,7 @@ func (a *App) CheckForUpdates() (*UpdateInfo, error) {
 	// Find download URL for current platform
 	platform := runtime.GOOS
 	arch := runtime.GOARCH
-	
+
 	for _, asset := range release.Assets {
 		name := strings.ToLower(asset.Name)
 		if strings.Contains(name, platform) && strings.Contains(name, arch) {
@@ -115,6 +115,6 @@ func (a *App) OpenReleaseURL(url string) error {
 func isNewerVersion(latest, current string) bool {
 	latest = strings.TrimPrefix(latest, "v")
 	current = strings.TrimPrefix(current, "v")
-	
+
 	return latest > current // Simplified comparison
 }

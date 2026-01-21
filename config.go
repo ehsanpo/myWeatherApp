@@ -8,10 +8,10 @@ import (
 
 // AppConfig represents the application configuration
 type AppConfig struct {
-	Theme        string            `json:"theme"`
-	Language     string            `json:"language"`
-	WindowWidth  int               `json:"windowWidth"`
-	WindowHeight int               `json:"windowHeight"`
+	Theme          string                 `json:"theme"`
+	Language       string                 `json:"language"`
+	WindowWidth    int                    `json:"windowWidth"`
+	WindowHeight   int                    `json:"windowHeight"`
 	CustomSettings map[string]interface{} `json:"customSettings"`
 }
 

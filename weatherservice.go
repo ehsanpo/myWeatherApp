@@ -11,36 +11,42 @@ import (
 
 // WeatherService handles weather-related operations
 type WeatherService struct {
-	app *App
+	app            *App
+	trayUpdateFunc func(*WeatherData)
 }
 
 // WeatherData represents the weather information
 type WeatherData struct {
-	Location    string  `json:"location"`
-	Temperature float64 `json:"temperature"`
-	FeelsLike   float64 `json:"feelsLike"`
-	Condition   string  `json:"condition"`
-	Description string  `json:"description"`
-	Humidity    int     `json:"humidity"`
-	WindSpeed   float64 `json:"windSpeed"`
-	Icon        string  `json:"icon"`
-	LastUpdated string  `json:"lastUpdated"`
+	Location    string        `json:"location"`
+	Temperature float64       `json:"temperature"`
+	FeelsLike   float64       `json:"feelsLike"`
+	Condition   string        `json:"condition"`
+	Description string        `json:"description"`
+	Humidity    int           `json:"humidity"`
+	WindSpeed   float64       `json:"windSpeed"`
+	Icon        string        `json:"icon"`
+	LastUpdated string        `json:"lastUpdated"`
 	Forecast    []ForecastDay `json:"forecast"`
 }
 
 // ForecastDay represents a single day forecast
 type ForecastDay struct {
-	Date        string  `json:"date"`
-	DayOfWeek   string  `json:"dayOfWeek"`
-	MaxTemp     float64 `json:"maxTemp"`
-	MinTemp     float64 `json:"minTemp"`
-	Condition   string  `json:"condition"`
-	Icon        string  `json:"icon"`
+	Date      string  `json:"date"`
+	DayOfWeek string  `json:"dayOfWeek"`
+	MaxTemp   float64 `json:"maxTemp"`
+	MinTemp   float64 `json:"minTemp"`
+	Condition string  `json:"condition"`
+	Icon      string  `json:"icon"`
 }
 
 // NewWeatherService creates a new weather service instance
 func NewWeatherService(app *App) *WeatherService {
 	return &WeatherService{app: app}
+}
+
+// SetTrayUpdateFunc sets the function to update the tray icon
+func (w *WeatherService) SetTrayUpdateFunc(updateFunc func(*WeatherData)) {
+	w.trayUpdateFunc = updateFunc
 }
 
 // GeocodingResult represents geocoding API response
@@ -56,17 +62,17 @@ type GeocodingResult struct {
 // OpenMeteoResponse represents the Open-Meteo API response
 type OpenMeteoResponse struct {
 	Current struct {
-		Temperature     float64 `json:"temperature_2m"`
-		RelativeHumidity int    `json:"relative_humidity_2m"`
-		ApparentTemp    float64 `json:"apparent_temperature"`
-		WindSpeed       float64 `json:"wind_speed_10m"`
-		WeatherCode     int     `json:"weather_code"`
+		Temperature      float64 `json:"temperature_2m"`
+		RelativeHumidity int     `json:"relative_humidity_2m"`
+		ApparentTemp     float64 `json:"apparent_temperature"`
+		WindSpeed        float64 `json:"wind_speed_10m"`
+		WeatherCode      int     `json:"weather_code"`
 	} `json:"current"`
 	Daily struct {
-		Time           []string  `json:"time"`
-		TempMax        []float64 `json:"temperature_2m_max"`
-		TempMin        []float64 `json:"temperature_2m_min"`
-		WeatherCode    []int     `json:"weather_code"`
+		Time        []string  `json:"time"`
+		TempMax     []float64 `json:"temperature_2m_max"`
+		TempMin     []float64 `json:"temperature_2m_min"`
+		WeatherCode []int     `json:"weather_code"`
 	} `json:"daily"`
 }
 
@@ -180,7 +186,7 @@ func (w *WeatherService) GetWeather(location string) (*WeatherData, error) {
 
 	// Convert to our weather data structure
 	condition, icon := weatherCodeToCondition(apiResp.Current.WeatherCode)
-	
+
 	weather := &WeatherData{
 		Location:    location,
 		Temperature: apiResp.Current.Temperature,
@@ -198,7 +204,7 @@ func (w *WeatherService) GetWeather(location string) (*WeatherData, error) {
 	for i := 1; i < len(apiResp.Daily.Time) && i <= 5; i++ {
 		date, _ := time.Parse("2006-01-02", apiResp.Daily.Time[i])
 		condition, icon := weatherCodeToCondition(apiResp.Daily.WeatherCode[i])
-		
+
 		forecast := ForecastDay{
 			Date:      apiResp.Daily.Time[i],
 			DayOfWeek: date.Format("Monday"),
@@ -219,13 +225,43 @@ func (w *WeatherService) UpdateLocation(location string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	if config.CustomSettings == nil {
 		config.CustomSettings = make(map[string]interface{})
 	}
-	
+
 	config.CustomSettings["weatherLocation"] = location
-	return w.app.SaveConfig(config)
+	err = w.app.SaveConfig(config)
+	if err != nil {
+		return err
+	}
+
+	// Update tray icon with weather for the new location
+	weather, err := w.GetWeather(location)
+	if err != nil {
+		return err
+	}
+
+	if w.trayUpdateFunc != nil {
+		w.trayUpdateFunc(weather)
+	}
+
+	return nil
+}
+
+// RefreshWeather refreshes the weather data and updates tray icon
+func (w *WeatherService) RefreshWeather(location string) (*WeatherData, error) {
+	weather, err := w.GetWeather(location)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update tray icon directly
+	if w.trayUpdateFunc != nil {
+		w.trayUpdateFunc(weather)
+	}
+
+	return weather, nil
 }
 
 // GetStoredLocation retrieves the stored weather location
@@ -234,10 +270,10 @@ func (w *WeatherService) GetStoredLocation() (string, error) {
 	if err != nil {
 		return "New York", err
 	}
-	
+
 	if config.CustomSettings["weatherLocation"] != nil {
 		return config.CustomSettings["weatherLocation"].(string), nil
 	}
-	
+
 	return "New York", nil
 }

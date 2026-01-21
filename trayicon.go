@@ -8,11 +8,11 @@ import (
 	"image/png"
 	"strconv"
 
+	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
-	"golang.org/x/image/math/fixed"
 	"golang.org/x/image/font/gofont/gobold"
-	"github.com/golang/freetype/truetype"
+	"golang.org/x/image/math/fixed"
 )
 
 // generateTrayIcon creates a tray icon with temperature text
@@ -48,7 +48,7 @@ func generateTrayIcon(temperature float64) ([]byte, error) {
 
 	// Prepare temperature text
 	tempStr := strconv.Itoa(int(temperature)) + "°"
-	
+
 	// Draw text in the center
 	point := fixed.Point26_6{
 		X: fixed.I(size/2 - len(tempStr)*3),
@@ -117,8 +117,8 @@ func generateTrayIconWithWeather(weather *WeatherData) ([]byte, error) {
 	}
 
 	// Temperature text - just the number, no degree symbol for better visibility
-	tempStr := strconv.Itoa(int(weather.Temperature))
-	
+	tempStr := strconv.Itoa(int(weather.Temperature + 0.5)) // Round to nearest integer
+
 	// Use a larger font
 	ft, err := truetype.Parse(gobold.TTF)
 	if err != nil {
@@ -143,7 +143,7 @@ func generateTrayIconWithWeather(weather *WeatherData) ([]byte, error) {
 	// Get text bounds for centering
 	bounds, _ := d.BoundString(tempStr)
 	textWidth := (bounds.Max.X - bounds.Min.X).Ceil()
-	
+
 	// Center the text (moved down 1 pixel)
 	point := fixed.Point26_6{
 		X: fixed.I((size - textWidth) / 2),
@@ -167,12 +167,12 @@ func generateTrayIconWithWeather(weather *WeatherData) ([]byte, error) {
 func generateSimpleTrayIcon(weather *WeatherData, img *image.RGBA) ([]byte, error) {
 	size := 64
 	tempStr := strconv.Itoa(int(weather.Temperature))
-	
+
 	// Draw large text manually using bigger basic font
 	// Draw each character larger by drawing multiple times with offset
 	startX := (size - len(tempStr)*20) / 2
 	startY := size/2 + 5
-	
+
 	for i, ch := range tempStr {
 		// Draw character multiple times to make it bold
 		for dx := 0; dx < 3; dx++ {

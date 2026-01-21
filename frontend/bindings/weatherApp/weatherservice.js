@@ -35,6 +35,26 @@ export function GetWeather(location) {
 }
 
 /**
+ * RefreshWeather refreshes the weather data and updates tray icon
+ * @param {string} location
+ * @returns {$CancellablePromise<$models.WeatherData | null>}
+ */
+export function RefreshWeather(location) {
+    return $Call.ByID(2131631672, location).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType1($result);
+    }));
+}
+
+/**
+ * SetTrayUpdateFunc sets the function to update the tray icon
+ * @param {any} updateFunc
+ * @returns {$CancellablePromise<void>}
+ */
+export function SetTrayUpdateFunc(updateFunc) {
+    return $Call.ByID(1213703656, updateFunc);
+}
+
+/**
  * UpdateLocation updates the weather location in config
  * @param {string} location
  * @returns {$CancellablePromise<void>}
